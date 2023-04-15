@@ -1,4 +1,4 @@
-use std::{collections::HashSet, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::{
@@ -8,16 +8,14 @@ use axum::{
     response::IntoResponse,
     routing, Router,
 };
-use futures::lock::Mutex;
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
+use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Our shared state
 struct AppState {
-    // We require unique usernames. This tracks which usernames have been taken.
-    user_set: Mutex<HashSet<String>>,
     // Channel used to send messages to all connected clients.
     tx: broadcast::Sender<ChatMessage>,
 }
@@ -38,16 +36,14 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Set up application state for use with with_state().
-    let user_set = Mutex::new(HashSet::new());
     let (tx, _rx) = broadcast::channel(100);
 
-    let app_state = Arc::new(AppState { user_set, tx });
+    let app_state = Arc::new(AppState { tx });
 
     let app = Router::new()
-        // .route("/", routing::get(index))
         .route("/websocket", routing::get(websocket_handler))
-        .with_state(app_state);
+        .with_state(app_state)
+        .nest_service("/", ServeDir::new("assets"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
@@ -55,6 +51,12 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+async fn index() -> impl IntoResponse {
+    let index_file = std::fs::read_to_string("index.html").unwrap();
+
+    index_file
 }
 
 async fn websocket_handler(
