@@ -53,12 +53,6 @@ async fn main() {
         .unwrap();
 }
 
-async fn index() -> impl IntoResponse {
-    let index_file = std::fs::read_to_string("index.html").unwrap();
-
-    index_file
-}
-
 async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<AppState>>,

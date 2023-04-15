@@ -6,12 +6,108 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Axum Chatroom</title>
 
-  <style>
-
-  </style>
+  <!-- <link href="https://cdn.jsdelivr.net/npm/daisyui@2.51.5/dist/full.css" rel="stylesheet" type="text/css" /> -->
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
 
   <script type="module">
+    import {
+        createSignal,
+        onCleanup,
+        createEffect,
+        For,
+        Show
+      } from "https://cdn.skypack.dev/solid-js";
+      import { render } from "https://cdn.skypack.dev/solid-js/web";
+      import { createStore } from "https://cdn.skypack.dev/solid-js/store";
+      import html from "https://cdn.skypack.dev/solid-js/html";
+
+
+      const App = () => {
+        const [state, setState] = createStore({
+          messages: [],
+          username: "",
+          message: "",
+        })
+
     
+        const ws = new WebSocket("ws://localhost:3000/websocket");
+
+        ws.onopen = () => {
+          console.log("Connected to websocket");
+        };
+
+        ws.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          setState("messages", (messages) => [...messages, message]);
+        };
+
+        const sendMessage = () => {
+          ws.send(JSON.stringify({
+            username: state.username ? state.username : "Anonymous",
+            text: state.message ? state.message : "No message",
+          }));
+          setState({message: ""});
+        };
+
+        return html`
+          <main class="w-screen max-w-2xl mx-auto py-10">
+            <section class="w-full flex flex-col items-center">
+              <h1 class="text-4xl font-bold text-gray-800">Axum Chatroom</h1>
+              <p class="text-gray-600">A simple chatroom built with Axum</p>
+            </section>
+
+            <section class="w-full flex flex-col items-center pt-4 gap-2">
+              <div class="w-full flex items-end justify-center gap-4">
+                <div class="w-full  flex flex-col items-start">
+                  <label class="text-gray-600">Name</label>
+                  <input 
+                    type="text"  
+                    class="w-full border border-gray-300 rounded-md p-2" 
+                    value=${() => state.username}
+                    oninput=${(e) => setState({username: e.target.value})}
+                  />
+                </div>
+
+                <div class="w-full flex flex-col items-start">
+                  <label class="text-gray-600">Message</label>
+                  <input 
+                    type="text"  
+                    class="w-full border border-gray-300 rounded-md p-2" 
+                    value=${() => state.message}
+                    oninput=${(e) => setState({message: e.target.value})}
+                  />
+                </div>
+
+                <button 
+                  class="w-40 h-12 bg-blue-500 text-white rounded-md hover:bg-blue-600 hover:text-gray-100" 
+                  onclick=${() => {
+                    sendMessage();
+                  }}
+                >
+                  Send
+                </button>
+                
+              </div>
+
+              <div class="w-full flex flex-col items-start pt-4">
+                <label class="text-gray-600">Messages</label>
+                <div class="w-full border border-gray-300 rounded-md p-2">
+                  <${For} each=${() => state.messages}>
+                    ${(message) => html`
+                      <div class="w-full flex items-start gap-2">
+                        <span class="text-gray-600">${message.username}: </span>
+                        <span class="text-gray-800">${message.text}</span>
+                      </div>
+                    `}
+                  </For>
+                </div>
+              </div>
+            </section>
+          </main>
+        `;
+      };
+
+      render(App, document.body);
   </script>
 </head>
 <body>
